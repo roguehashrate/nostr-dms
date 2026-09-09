@@ -113,28 +113,35 @@ PluginComponent {
     property var replyTarget: null
     property bool replyBusy: false
     property bool reactBusy: false
+    property var replyComposer: null
 
     function startReply(modelData) {
+        log.info("nostr reply start kind=" + modelData.kind);
         if (root.usingDefaultKey) {
             ToastService.showWarning("Add your key first", "Set your nsec with the key button to reply from your own account.");
             return;
         }
         root.replyTarget = modelData;
-        replyField.text = "";
-        replyField.forceActiveFocus();
+        if (root.replyComposer) {
+            root.replyComposer.open();
+        }
     }
 
     function cancelReply() {
         root.replyTarget = null;
-        replyBusy = false;
-        replyField.text = "";
+        root.replyBusy = false;
+        if (root.replyComposer) {
+            root.replyComposer.close();
+        }
     }
 
     function sendReply() {
+        log.info("nostr reply invoked busy=" + replyBusy + " target=" + (root.replyTarget ? "yes" : "no"));
         if (replyBusy || !root.replyTarget) {
             return;
         }
-        var text = String(replyField.text || "").trim();
+        var text = String(root.replyComposer ? root.replyComposer.text : "").trim();
+        log.info("nostr reply textlen=" + text.length);
         if (text.length === 0) {
             ToastService.showWarning("Empty reply", "Type something first.");
             return;
@@ -156,9 +163,11 @@ PluginComponent {
         }
         args.push("-p", root.replyTarget.replyToPubkey || root.replyTarget.pubkey);
         args = args.concat(relays);
+        log.info("nostr reply send text=" + text.length + " nsec=" + nsec.length + " relays=" + relays.length + " e=" + String(root.replyTarget.id).slice(0, 8));
         replyBusy = true;
         Proc.runCommand("nostr.reply", args, (stdout, exitCode) => {
             replyBusy = false;
+            log.info("nostr reply result exit=" + exitCode + " out=" + String(stdout || "").slice(0, 400));
             if (exitCode === 0) {
                 ToastService.showInfo("Reply sent", "Published to " + relays.length + " relay(s).");
                 root.cancelReply();
@@ -325,6 +334,8 @@ PluginComponent {
         }
     }
 
+    Component.onCompleted: log.info("nostr widget live v2")
+
     popoutContent: Component {
         Column {
             id: popoutRoot
@@ -332,6 +343,26 @@ PluginComponent {
             height: implicitHeight
 
             property var closePopout: null
+
+            QtObject {
+                id: composerBridge
+
+                property string text: replyField.text
+
+                function open() {
+                    replyField.text = "";
+                    replyField.forceActiveFocus();
+                }
+
+                function close() {
+                    replyField.text = "";
+                    replyField.releaseFocus();
+                }
+
+                Component.onCompleted: {
+                    root.replyComposer = composerBridge;
+                }
+            }
 
             Item {
                 id: header
@@ -571,6 +602,24 @@ PluginComponent {
                                     }
                                 }
 
+                                MouseArea {
+                                    id: innerArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (replyArea.containsMouse) {
+                                            root.startReply(modelData);
+                                            return;
+                                        }
+                                        if (reactArea.containsMouse) {
+                                            root.sendReaction(modelData);
+                                            return;
+                                        }
+                                        Qt.openUrlExternally("https://njump.me/" + modelData.id);
+                                    }
+                                }
+
                                 Row {
                                     id: cardRow
                                     anchors.fill: parent
@@ -735,14 +784,6 @@ PluginComponent {
                                             horizontalAlignment: Text.AlignRight
                                         }
                                     }
-                                }
-
-                                MouseArea {
-                                    id: innerArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: Qt.openUrlExternally("https://njump.me/" + modelData.id)
                                 }
                             }
                         }
