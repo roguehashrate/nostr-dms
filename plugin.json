@@ -1,0 +1,34 @@
+{
+  "id": "nostrDms",
+  "name": "Nostr",
+  "description": "Publish notes from the launcher and get desktop notifications for replies, reactions and zaps to your posts.",
+  "version": "1.0.0",
+  "author": "you",
+  "type": "composite",
+  "capabilities": [
+    "nostr",
+    "notifications",
+    "daemon",
+    "launcher",
+    "widget"
+  ],
+  "icon": "bolt",
+  "trigger": "n",
+  "components": {
+    "widget": "./NostrWidget.qml",
+    "daemon": "./NostrDaemon.qml",
+    "launcher": "./NostrLauncher.qml"
+  },
+  "settings": "./NostrSettings.qml",
+  "startupCheck": "./StartupCheck.qml",
+  "requires_dms": ">=1.5.0",
+  "dependencies": [
+    "nak"
+  ],
+  "permissions": [
+    "settings_read",
+    "settings_write",
+    "process",
+    "network"
+  ]
+}
