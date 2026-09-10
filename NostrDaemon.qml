@@ -3,7 +3,7 @@ import Quickshell.Io
 import qs.Common
 import qs.Services
 import qs.Modules.Plugins
-import "nostrlib2.js" as Nostr
+import "nostrlib3.js" as Nostr
 
 PluginComponent {
     id: root

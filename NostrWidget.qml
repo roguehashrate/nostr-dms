@@ -3,7 +3,7 @@ import qs.Common
 import qs.Services
 import qs.Widgets
 import qs.Modules.Plugins
-import "nostrlib2.js" as Nostr
+import "nostrlib3.js" as Nostr
 
 PluginComponent {
     id: root
@@ -62,6 +62,8 @@ PluginComponent {
         return base;
     }
 
+    readonly property string nostrLogo: Theme.isLightMode ? Qt.resolvedUrl("assets/nostr-black.svg") : Qt.resolvedUrl("assets/nostr-white.svg")
+
     function kindIcon(kind) {
         return Nostr.eventKindIcon(kind);
     }
@@ -87,8 +89,15 @@ PluginComponent {
         }
         return Nostr.preview(String(modelData.verb || ""), 140);
     }
+    function bodyHasEmoji(modelData) {
+        return Nostr.textHasEmoji(root.bodyLine(modelData));
+    }
     function bodyLineHtml(modelData) {
-        return Nostr.emojiHtml(root.bodyLine(modelData));
+        var line = root.bodyLine(modelData);
+        if (Nostr.textHasEmoji(line)) {
+            return Nostr.emojiHtml(Nostr.preview(line, 60));
+        }
+        return line;
     }
     function kindLabel(modelData) {
         if (modelData.kind === Nostr.KIND_ZAP_RECEIPT) {
@@ -278,12 +287,13 @@ PluginComponent {
             id: pillRow
             spacing: Theme.spacingXS
 
-            DankIcon {
-                id: pillIcon
-                name: "bolt"
-                size: root.iconSize
-                filled: true
-                color: root.unread > 0 ? Theme.primary : Theme.widgetIconColor
+            Image {
+                id: pillLogo
+                source: root.nostrLogo
+                width: root.iconSize
+                height: root.iconSize
+                sourceSize.width: root.iconSize * 2
+                sourceSize.height: root.iconSize * 2
                 anchors.verticalCenter: parent.verticalCenter
             }
 
@@ -328,11 +338,13 @@ PluginComponent {
                 anchors.centerIn: parent
                 spacing: Theme.spacingXXS
 
-                DankIcon {
-                    name: "bolt"
-                    size: root.iconSize - 6
-                    filled: true
-                    color: root.unread > 0 ? Theme.primary : Theme.widgetIconColor
+                Image {
+                    id: verticalLogo
+                    source: root.nostrLogo
+                    width: root.iconSize - 6
+                    height: root.iconSize - 6
+                    sourceSize.width: (root.iconSize - 6) * 2
+                    sourceSize.height: (root.iconSize - 6) * 2
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
 
@@ -708,8 +720,11 @@ PluginComponent {
                                             text: root.bodyLineHtml(modelData)
                                             color: Theme.surfaceVariantText
                                             font.pixelSize: Theme.fontSizeSmall
-                                            textFormat: Text.RichText
+                                            textFormat: root.bodyHasEmoji(modelData) ? Text.RichText : Text.PlainText
+                                            wrapMode: root.bodyHasEmoji(modelData) ? Text.NoWrap : Text.WordWrap
+                                            elide: root.bodyHasEmoji(modelData) ? Text.ElideNone : Text.ElideRight
                                             maximumLineCount: 1
+                                            clip: true
                                         }
                                     }
 
@@ -818,12 +833,13 @@ PluginComponent {
                                     border.width: 1
                                     anchors.horizontalCenter: parent.horizontalCenter
 
-                                    DankIcon {
+                                    Image {
                                         anchors.centerIn: parent
-                                        name: root.connected ? "bolt" : "wifi_off"
-                                        size: 32
-                                        filled: true
-                                        color: root.connected ? Theme.primary : Theme.warning
+                                        source: root.nostrLogo
+                                        width: 34
+                                        height: 34
+                                        sourceSize.width: 68
+                                        sourceSize.height: 68
                                     }
                                 }
 

@@ -213,6 +213,16 @@ function htmlEscape(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+function textHasEmoji(s) {
+    s = String(s || "");
+    for (var i = 0; i < s.length; i++) {
+        if (s.charCodeAt(i) > 0x7e) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function emojiHtml(input) {
     var s = String(input);
     var out = "";
