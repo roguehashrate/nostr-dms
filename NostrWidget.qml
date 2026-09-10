@@ -116,7 +116,6 @@ PluginComponent {
     property var replyComposer: null
 
     function startReply(modelData) {
-        log.info("nostr reply start kind=" + modelData.kind);
         if (root.usingDefaultKey) {
             ToastService.showWarning("Add your key first", "Set your nsec with the key button to reply from your own account.");
             return;
@@ -135,47 +134,82 @@ PluginComponent {
         }
     }
 
-    function sendReply() {
-        log.info("nostr reply invoked busy=" + replyBusy + " target=" + (root.replyTarget ? "yes" : "no"));
-        if (replyBusy || !root.replyTarget) {
-            return;
-        }
-        var text = String(root.replyComposer ? root.replyComposer.text : "").trim();
-        log.info("nostr reply textlen=" + text.length);
-        if (text.length === 0) {
-            ToastService.showWarning("Empty reply", "Type something first.");
-            return;
-        }
+    function shQuote(s) {
+        return "'" + String(s).replace(/'/g, "'\\''") + "'";
+    }
+
+    function publishEvent(label, kind, contentText, eId, eRoot, pKey, onDone) {
         var nsec = String(pluginData.nsec || "").trim();
         if (nsec.length === 0) {
-            root.cancelReply();
             ToastService.showWarning("No key", "Add your nsec in the key setup first.");
+            onDone(false);
             return;
         }
         var relays = Nostr.normalizeRelays(pluginData.relays || Nostr.DEFAULT_RELAYS);
         if (relays.length === 0) {
             ToastService.showWarning("No relays", "Configure at least one relay in plugin settings.");
+            onDone(false);
             return;
         }
-        var args = ["nak", "event", "publish", "--sec", nsec, "-k", "1", "-c", text, "-e", root.replyTarget.id];
-        if (root.replyTarget.rootId && root.replyTarget.rootId !== root.replyTarget.id) {
-            args.push("-e", root.replyTarget.rootId);
+        var body = String(contentText || "");
+        if (body.charAt(0) === "@") {
+            body = "\u200b" + body;
         }
-        args.push("-p", root.replyTarget.replyToPubkey || root.replyTarget.pubkey);
-        args = args.concat(relays);
-        log.info("nostr reply send text=" + text.length + " nsec=" + nsec.length + " relays=" + relays.length + " e=" + String(root.replyTarget.id).slice(0, 8));
-        replyBusy = true;
-        Proc.runCommand("nostr.reply", args, (stdout, exitCode) => {
-            replyBusy = false;
-            log.info("nostr reply result exit=" + exitCode + " out=" + String(stdout || "").slice(0, 400));
-            if (exitCode === 0) {
-                ToastService.showInfo("Reply sent", "Published to " + relays.length + " relay(s).");
-                root.cancelReply();
-            } else {
-                var err = String(stdout || "").trim().split("\n");
-                ToastService.showWarning("Reply failed", err.length > 0 ? err[err.length - 1] : "unknown error");
+        var i = 0;
+        var lastErr = "";
+        function attempt() {
+            if (i >= relays.length) {
+                ToastService.showWarning(label + " failed", lastErr || "all relays timed out");
+                onDone(false);
+                return;
             }
-        }, 0, 25000, root);
+            var parts = ["nak", "event", "--sec", shQuote(nsec), "-k", kind, "-c", shQuote(body), "-e", shQuote(eId)];
+            if (eRoot && eRoot !== eId) {
+                parts.push("-e");
+                parts.push(shQuote(eRoot));
+            }
+            parts.push("-p");
+            parts.push(shQuote(pKey));
+            parts.push(shQuote(relays[i]));
+            var relay = relays[i];
+            var attemptNo = i + 1;
+            i++;
+            log.info("nostr publish " + label + " try " + attemptNo + "/" + relays.length + " " + relay);
+            Proc.runCommand(null, ["bash", "-c", parts.join(" ") + " 2>&1 < /dev/null"], (stdout, exitCode) => {
+                log.info("nostr publish " + label + " result exit=" + exitCode + " out=" + String(stdout || "").slice(0, 300));
+                if (exitCode === 0) {
+                    onDone(true);
+                    return;
+                }
+                var lines = String(stdout || "").trim().split("\n");
+                lastErr = lines.length > 0 ? lines[lines.length - 1] : "unknown error";
+                attempt();
+            }, 0, 8000, root);
+        }
+        attempt();
+    }
+
+    function sendReply() {
+        if (replyBusy || !root.replyTarget) {
+            return;
+        }
+        var text = String(root.replyComposer ? root.replyComposer.text : "").trim();
+        if (text.length === 0) {
+            ToastService.showWarning("Empty reply", "Type something first.");
+            return;
+        }
+        var target = root.replyTarget;
+        var eId = target.id;
+        var eRoot = (target.rootId && target.rootId !== target.id) ? target.rootId : "";
+        var pKey = target.replyToPubkey || target.pubkey;
+        replyBusy = true;
+        publishEvent("Reply", "1", text, eId, eRoot, pKey, (ok) => {
+            replyBusy = false;
+            if (ok) {
+                ToastService.showInfo("Reply sent", "Published to a relay.");
+                root.cancelReply();
+            }
+        });
     }
 
     function sendReaction(target) {
@@ -186,32 +220,16 @@ PluginComponent {
             ToastService.showWarning("Add your key first", "Set your nsec with the key button to react from your own account.");
             return;
         }
-        var nsec = String(pluginData.nsec || "").trim();
-        if (nsec.length === 0) {
-            ToastService.showWarning("No key", "Add your nsec in the key setup first.");
-            return;
-        }
-        var relays = Nostr.normalizeRelays(pluginData.relays || Nostr.DEFAULT_RELAYS);
-        if (relays.length === 0) {
-            ToastService.showWarning("No relays", "Configure at least one relay in plugin settings.");
-            return;
-        }
-        var args = ["nak", "event", "publish", "--sec", nsec, "-k", "7", "-c", "+", "-e", target.id];
-        if (target.rootId && target.rootId !== target.id) {
-            args.push("-e", target.rootId);
-        }
-        args.push("-p", target.replyToPubkey || target.pubkey);
-        args = args.concat(relays);
+        var eId = target.id;
+        var eRoot = (target.rootId && target.rootId !== target.id) ? target.rootId : "";
+        var pKey = target.replyToPubkey || target.pubkey;
         reactBusy = true;
-        Proc.runCommand("nostr.react", args, (stdout, exitCode) => {
+        publishEvent("Reaction", "7", "+", eId, eRoot, pKey, (ok) => {
             reactBusy = false;
-            if (exitCode === 0) {
-                ToastService.showInfo("Reaction sent", "You liked " + Nostr.shortPubkey(target.replyToPubkey || target.pubkey) + "'s note.");
-            } else {
-                var err = String(stdout || "").trim().split("\n");
-                ToastService.showWarning("Reaction failed", err.length > 0 ? err[err.length - 1] : "unknown error");
+            if (ok) {
+                ToastService.showInfo("Reaction sent", "You liked " + Nostr.shortPubkey(pKey) + "'s note.");
             }
-        }, 0, 25000, root);
+        });
     }
 
     function saveKey(text) {
@@ -224,7 +242,7 @@ PluginComponent {
             pluginService.savePluginData(pluginId, "nsec", key);
         }
         setupOpen = false;
-        Proc.runCommand("nostr.pubkey", ["nak", "key", "public", key], (stdout, exitCode) => {
+        Proc.runCommand("nostr.widget.pubkey", ["nak", "key", "public", key], (stdout, exitCode) => {
             if (exitCode === 0) {
                 var pk = String(stdout || "").trim();
                 var shortKey = pk.length >= 16 ? pk.slice(0, 12) + "..." + pk.slice(-4) : pk;
@@ -356,7 +374,7 @@ PluginComponent {
 
                 function close() {
                     replyField.text = "";
-                    replyField.releaseFocus();
+                    replyField.focus = false;
                 }
 
                 Component.onCompleted: {
