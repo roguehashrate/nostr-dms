@@ -68,11 +68,18 @@ nak --version
 
 ### 2. Install the plugin
 
-Copy this folder into the DMS plugins directory:
+Clone or copy this repo into the DMS plugins directory:
 
 ```sh
 mkdir -p ~/.config/DankMaterialShell/plugins
-cp -r /home/roguehashrate/code/nostr-dms ~/.config/DankMaterialShell/plugins/nostr-dms
+cp -r nostr-dms ~/.config/DankMaterialShell/plugins/nostr-dms
+```
+
+Or clone directly:
+
+```sh
+mkdir -p ~/.config/DankMaterialShell/plugins
+git clone https://github.com/roguehashrate/nostr-dms.git ~/.config/DankMaterialShell/plugins/nostr-dms
 ```
 
 Then in DMS:
