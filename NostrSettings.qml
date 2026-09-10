@@ -9,12 +9,26 @@ PluginSettings {
     id: root
     pluginId: "nostrDms"
 
-    StyledText {
+    Row {
         width: parent.width
-        text: "Nostr"
-        font.pixelSize: Theme.fontSizeXLarge
-        font.weight: Font.Bold
-        color: Theme.surfaceText
+        spacing: Theme.spacingM
+        topPadding: Theme.spacingS
+
+        Image {
+            id: settingsLogo
+            source: Theme.isLightMode ? Qt.resolvedUrl("assets/nostr-black.svg") : Qt.resolvedUrl("assets/nostr-white.svg")
+            sourceSize.height: 36
+            fillMode: Image.PreserveAspectFit
+            anchors.verticalCenter: parent.verticalCenter
+        }
+
+        StyledText {
+            text: "Nostr"
+            font.pixelSize: Theme.fontSizeXLarge
+            font.weight: Font.Bold
+            color: Theme.surfaceText
+            anchors.verticalCenter: parent.verticalCenter
+        }
     }
 
     StyledText {
