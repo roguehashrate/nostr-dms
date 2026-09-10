@@ -1,7 +1,7 @@
 import QtQuick
 import Quickshell.Io
 import qs.Services
-import "nostrlib.js" as Nostr
+import "nostrlib2.js" as Nostr
 
 Item {
     id: root

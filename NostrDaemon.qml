@@ -3,7 +3,7 @@ import Quickshell.Io
 import qs.Common
 import qs.Services
 import qs.Modules.Plugins
-import "nostrlib.js" as Nostr
+import "nostrlib2.js" as Nostr
 
 PluginComponent {
     id: root
@@ -15,6 +15,8 @@ PluginComponent {
     property int maxSeen: 4000
     property var notifications: []
     property int unreadCount: 0
+    readonly property int cfgRetentionSeconds: 2 * 3600
+    readonly property int cfgMaxItems: 20
 
     property string cfgNsec: ""
     property var cfgRelays: []
@@ -87,10 +89,11 @@ PluginComponent {
         }
         var saved = pluginService.loadPluginState(pluginId, "notifications", []);
         if (Array.isArray(saved)) {
-            notifications = saved.slice(0, 60);
+            notifications = saved;
         }
         var savedUnread = pluginService.loadPluginState(pluginId, "unreadCount", 0);
         unreadCount = isNaN(savedUnread) ? 0 : savedUnread;
+        pruneNotifications();
         publishState();
     }
 
@@ -125,10 +128,10 @@ PluginComponent {
             setConnected(false, "No relays configured in plugin settings.");
             return;
         }
-        var cmd = ["nak", "req", "--stream", "-k", "1", "-k", "7", "-k", "9735", "-p", myPubkey];
+        var cmd = ["nak", "req", "--stream", "-k", "1", "-k", "7", "-k", "9735", "-k", "1111", "-p", myPubkey];
         var now = Math.floor(Date.now() / 1000);
         var since = now - cfgSinceDays * 86400;
-        cmd.push("-s", String(since));
+        cmd.push("-s", String(now - cfgRetentionSeconds));
         for (var i = 0; i < cfgRelays.length; i++) {
             cmd.push(cfgRelays[i]);
         }
@@ -175,6 +178,33 @@ PluginComponent {
         }
     }
 
+    function hasNotificationId(id) {
+        for (var i = 0; i < notifications.length; i++) {
+            if (notifications[i] && notifications[i].id === id) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function pruneNotifications() {
+        var cutoff = Math.floor(Date.now() / 1000) - cfgRetentionSeconds;
+        var kept = notifications.filter(function (e) {
+            return e && typeof e.createdAt === "number" && e.createdAt >= cutoff;
+        });
+        kept.sort(function (a, b) {
+            return b.createdAt - a.createdAt;
+        });
+        if (kept.length > cfgMaxItems) {
+            kept = kept.slice(0, cfgMaxItems);
+        }
+        if (notifications.length !== kept.length) {
+            notifications = kept;
+            persistState();
+            publishState();
+        }
+    }
+
     function handleEvent(evt) {
         var entry = {
             id: evt.id,
@@ -215,7 +245,7 @@ PluginComponent {
             entry.verb = "reacted " + glyph;
             entry.title = "Reacted " + glyph;
             entry.icon = "favorite";
-        } else if (evt.kind === 1) {
+        } else if (evt.kind === 1 || evt.kind === 1111) {
             if (!cfgWatchReplies) {
                 return;
             }
@@ -245,9 +275,13 @@ PluginComponent {
 
         ensureProfile(entry.authorPubkey);
 
+        if (hasNotificationId(evt.id)) {
+            return;
+        }
+
         notifications.unshift(entry);
-        if (notifications.length > 60) {
-            notifications = notifications.slice(0, 60);
+        if (notifications.length > cfgMaxItems) {
+            notifications = notifications.slice(0, cfgMaxItems);
         }
         unreadCount += 1;
         persistState();
@@ -396,6 +430,18 @@ PluginComponent {
         onTriggered: {
             if (!quitting && myPubkey.length === 64) {
                 startWatch(myPubkey);
+            }
+        }
+    }
+
+    Timer {
+        id: pruneTimer
+        interval: 60000
+        repeat: true
+        running: true
+        onTriggered: {
+            if (!quitting) {
+                pruneNotifications();
             }
         }
     }

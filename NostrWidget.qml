@@ -3,7 +3,7 @@ import qs.Common
 import qs.Services
 import qs.Widgets
 import qs.Modules.Plugins
-import "nostrlib.js" as Nostr
+import "nostrlib2.js" as Nostr
 
 PluginComponent {
     id: root
@@ -112,8 +112,10 @@ PluginComponent {
 
     property var replyTarget: null
     property bool replyBusy: false
+    property var reactTarget: null
     property bool reactBusy: false
     property var replyComposer: null
+    readonly property var reactOptions: ["\uD83D\uDC4D", "\u2764\uFE0F", "\uD83D\uDC9C", "\uD83D\uDE02", "\uD83D\uDE2E", "\uD83D\uDE22", "\uD83D\uDD25", "\uD83C\uDF89", "\uD83D\uDC4F", "\uD83E\uDD14", "\uD83D\uDCAF", "\uD83D\uDC40"]
 
     function startReply(modelData) {
         if (root.usingDefaultKey) {
@@ -202,8 +204,9 @@ PluginComponent {
         var eId = target.id;
         var eRoot = (target.rootId && target.rootId !== target.id) ? target.rootId : "";
         var pKey = target.replyToPubkey || target.pubkey;
+        var sendKind = target.kind === 1111 ? "1111" : "1";
         replyBusy = true;
-        publishEvent("Reply", "1", text, eId, eRoot, pKey, (ok) => {
+        publishEvent("Reply", sendKind, text, eId, eRoot, pKey, (ok) => {
             replyBusy = false;
             if (ok) {
                 ToastService.showInfo("Reply sent", "Published to a relay.");
@@ -220,14 +223,25 @@ PluginComponent {
             ToastService.showWarning("Add your key first", "Set your nsec with the key button to react from your own account.");
             return;
         }
-        var eId = target.id;
-        var eRoot = (target.rootId && target.rootId !== target.id) ? target.rootId : "";
+        root.reactTarget = (root.reactTarget === target) ? null : target;
+    }
+
+    function sendReactionEmoji(content) {
+        var target = root.reactTarget;
+        if (!target || reactBusy) {
+            return;
+        }
+        if (root.usingDefaultKey) {
+            ToastService.showWarning("Add your key first", "Set your nsec with the key button to react from your own account.");
+            return;
+        }
         var pKey = target.replyToPubkey || target.pubkey;
         reactBusy = true;
-        publishEvent("Reaction", "7", "+", eId, eRoot, pKey, (ok) => {
+        publishEvent("Reaction", "7", content, target.id, "", pKey, (ok) => {
             reactBusy = false;
             if (ok) {
-                ToastService.showInfo("Reaction sent", "You liked " + Nostr.shortPubkey(pKey) + "'s note.");
+                ToastService.showInfo("Reaction sent", "Reacted " + content);
+                root.reactTarget = null;
             }
         });
     }
@@ -499,7 +513,7 @@ PluginComponent {
             Item {
                 id: bodyRoot
                 width: parent.width
-                implicitHeight: root.popoutHeight - Theme.spacingS * 2 - header.height - 1 - replyBar.height
+                implicitHeight: root.popoutHeight - Theme.spacingS * 2 - header.height - 1 - replyBar.height - reactionPicker.height
 
                 Column {
                     anchors.fill: parent
@@ -655,35 +669,39 @@ PluginComponent {
                                             width: 40
                                             height: 40
                                             radius: 20
-                                            color: Theme.withAlpha(root.kindColor(modelData.kind), 0.16)
-                                            visible: modelData.kind === Nostr.KIND_REACTION || String(modelData.pfpUrl || "").length === 0
-
-                                            DankIcon {
-                                                anchors.centerIn: parent
-                                                name: root.kindIcon(modelData.kind)
-                                                size: 18
-                                                filled: true
-                                                color: root.kindColor(modelData.kind)
-                                                visible: modelData.kind !== Nostr.KIND_REACTION
-                                            }
-
-                                            StyledText {
-                                                anchors.centerIn: parent
-                                                text: root.reactionEmoji(modelData.kind, modelData.content)
-                                                font.pixelSize: Theme.fontSizeXLarge
-                                                visible: modelData.kind === Nostr.KIND_REACTION
-                                            }
+                                            color: Theme.withAlpha(root.kindColor(modelData.kind), 0.12)
+                                            visible: String(modelData.pfpUrl || "").length === 0
                                         }
 
                                         DankCircularImage {
                                             anchors.centerIn: parent
                                             width: 40
                                             height: 40
-                                            visible: modelData.kind !== Nostr.KIND_REACTION && String(modelData.pfpUrl || "").length > 0
+                                            visible: String(modelData.pfpUrl || "").length > 0
                                             imageSource: modelData.pfpUrl || ""
-                                            fallbackIcon: root.kindIcon(modelData.kind)
                                             border.color: Theme.withAlpha(root.kindColor(modelData.kind), 0.25)
                                             border.width: 1
+                                        }
+
+                                        Rectangle {
+                                            id: reactionBadge
+                                            visible: modelData.kind === Nostr.KIND_REACTION
+                                            anchors.right: parent.right
+                                            anchors.bottom: parent.bottom
+                                            anchors.rightMargin: -3
+                                            anchors.bottomMargin: -3
+                                            width: 22
+                                            height: 22
+                                            radius: 11
+                                            color: Theme.surfaceContainerHigh
+                                            border.color: Theme.withAlpha(Theme.secondary, 0.35)
+                                            border.width: 1
+
+                                            StyledText {
+                                                anchors.centerIn: parent
+                                                text: root.reactionEmoji(modelData.kind, modelData.content)
+                                                font.pixelSize: 14
+                                            }
                                         }
 
                                         Rectangle {
@@ -728,7 +746,7 @@ PluginComponent {
                                         anchors.verticalCenter: parent.verticalCenter
 
                                         Row {
-                                            visible: modelData.kind === 1
+                                            visible: modelData.kind === 1 || modelData.kind === 1111
                                             anchors.right: parent.right
                                             spacing: 4
 
@@ -948,6 +966,65 @@ PluginComponent {
                             textColor: Theme.surfaceVariantText
                             enabled: !root.replyBusy
                             onClicked: root.cancelReply()
+                        }
+                    }
+                }
+            }
+        Item {
+                id: reactionPicker
+                width: parent.width
+                height: root.reactTarget && !root.reactBusy ? 56 : 0
+                clip: true
+
+                Behavior on height {
+                    NumberAnimation {
+                        duration: 180
+                        easing.type: Easing.OutCubic
+                    }
+                }
+
+                Rectangle {
+                    anchors.fill: parent
+                    color: Theme.surfaceContainerHigh
+
+                    Rectangle {
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        height: 1
+                        color: Theme.withAlpha(Theme.surfaceText, 0.08)
+                    }
+
+                    Row {
+                        anchors.fill: parent
+                        anchors.leftMargin: Theme.spacingS
+                        anchors.rightMargin: Theme.spacingS
+                        spacing: Theme.spacingXS
+
+                        Repeater {
+                            model: root.reactOptions
+
+                            Rectangle {
+                                width: 40
+                                height: 40
+                                radius: 20
+                                anchors.verticalCenter: parent.verticalCenter
+                                color: pickerItem.containsMouse ? Theme.withAlpha(Theme.primary, 0.16) : "transparent"
+
+                                StyledText {
+                                    anchors.centerIn: parent
+                                    text: modelData
+                                    font.pixelSize: 20
+                                }
+
+                                MouseArea {
+                                    id: pickerItem
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.sendReactionEmoji(modelData)
+                                }
+                            }
                         }
                     }
                 }
