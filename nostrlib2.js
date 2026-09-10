@@ -209,6 +209,48 @@ function emojiEnforceColor(s) {
     return s + "\uFE0F";
 }
 
+function htmlEscape(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function emojiHtml(input) {
+    var s = String(input);
+    var out = "";
+    var plain = "";
+    var emoji = "";
+    var i = 0;
+    while (i < s.length) {
+        var c0 = s.charCodeAt(i);
+        var isPlain = c0 <= 0x7e;
+        if (isPlain) {
+            if (emoji.length > 0) {
+                out += '<font face="Noto Color Emoji">' + htmlEscape(emoji) + "</font>";
+                emoji = "";
+            }
+            plain += s[i];
+            i += 1;
+        } else {
+            if (plain.length > 0) {
+                out += htmlEscape(plain);
+                plain = "";
+            }
+            emoji += s[i];
+            i += 1;
+            if (c0 >= 0xd800 && c0 <= 0xdbff && i < s.length) {
+                emoji += s[i];
+                i += 1;
+            }
+        }
+    }
+    if (plain.length > 0) {
+        out += htmlEscape(plain);
+    }
+    if (emoji.length > 0) {
+        out += '<font face="Noto Color Emoji">' + htmlEscape(emoji) + "</font>";
+    }
+    return out;
+}
+
 function reactionGlyph(content) {
     var c = String(content || "").trim();
     if (c.length === 0) {

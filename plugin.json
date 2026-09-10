@@ -3,7 +3,7 @@
   "name": "Nostr",
   "description": "Publish notes from the launcher and get desktop notifications for replies, reactions and zaps to your posts.",
   "version": "1.0.0",
-  "author": "you",
+  "author": "RogueHashrate",
   "type": "composite",
   "capabilities": [
     "nostr",

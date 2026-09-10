@@ -87,6 +87,9 @@ PluginComponent {
         }
         return Nostr.preview(String(modelData.verb || ""), 140);
     }
+    function bodyLineHtml(modelData) {
+        return Nostr.emojiHtml(root.bodyLine(modelData));
+    }
     function kindLabel(modelData) {
         if (modelData.kind === Nostr.KIND_ZAP_RECEIPT) {
             return modelData.sats > 0 ? Nostr.formatSats(modelData.sats) + " SATS" : "ZAP";
@@ -369,43 +372,15 @@ PluginComponent {
     Component.onCompleted: log.info("nostr widget live v2")
 
     popoutContent: Component {
-        Column {
-            id: popoutRoot
-            width: parent.width
-            height: implicitHeight
+        PopoutComponent {
+            id: popoutColumn
 
-            property var closePopout: null
+            headerText: "Nostr"
+            detailsText: root.detailsLine
+            showCloseButton: true
 
-            QtObject {
-                id: composerBridge
-
-                property string text: replyField.text
-
-                function open() {
-                    replyField.text = "";
-                    replyField.forceActiveFocus();
-                }
-
-                function close() {
-                    replyField.text = "";
-                    replyField.focus = false;
-                }
-
-                Component.onCompleted: {
-                    root.replyComposer = composerBridge;
-                }
-            }
-
-            Item {
-                id: header
-                width: parent.width
-                height: 44
-
+            headerActions: Component {
                 Row {
-                    id: headerActions
-                    anchors.right: parent.right
-                    anchors.rightMargin: Theme.spacingS
-                    anchors.verticalCenter: parent.verticalCenter
                     spacing: Theme.spacingXS
 
                     Rectangle {
@@ -459,61 +434,35 @@ PluginComponent {
                         visible: root.unread > 0
                         onClicked: root.markAllRead()
                     }
-
-                    Rectangle {
-                        id: closeButton
-                        width: 32
-                        height: 32
-                        radius: 16
-                        color: closeArea.containsMouse ? Theme.errorHover : Theme.withAlpha(Theme.errorHover, 0)
-
-                        DankIcon {
-                            anchors.centerIn: parent
-                            name: "close"
-                            size: Theme.iconSize - 4
-                            color: closeArea.containsMouse ? Theme.error : Theme.surfaceText
-                        }
-
-                        MouseArea {
-                            id: closeArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                if (popoutRoot.closePopout) {
-                                    popoutRoot.closePopout();
-                                }
-                            }
-                        }
-                    }
-                }
-
-                StyledText {
-                    id: headerTitle
-                    anchors.left: parent.left
-                    anchors.leftMargin: Theme.spacingS
-                    anchors.right: headerActions.left
-                    anchors.rightMargin: Theme.spacingXS
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "Nostr"
-                    elide: Text.ElideRight
-                    maximumLineCount: 1
-                    font.pixelSize: Theme.fontSizeLarge + 4
-                    font.weight: Font.Bold
-                    color: Theme.surfaceText
                 }
             }
 
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: Theme.withAlpha(Theme.surfaceText, 0.08)
+            property var closePopout: null
+
+            QtObject {
+                id: composerBridge
+
+                property string text: replyField.text
+
+                function open() {
+                    replyField.text = "";
+                    replyField.forceActiveFocus();
+                }
+
+                function close() {
+                    replyField.text = "";
+                    replyField.focus = false;
+                }
+
+                Component.onCompleted: {
+                    root.replyComposer = composerBridge;
+                }
             }
 
             Item {
                 id: bodyRoot
                 width: parent.width
-                implicitHeight: root.popoutHeight - Theme.spacingS * 2 - header.height - 1 - replyBar.height - reactionPicker.height
+                implicitHeight: root.popoutHeight - Theme.spacingS * 2 - popoutColumn.headerHeight - popoutColumn.detailsHeight - replyBar.height - reactionPicker.height
 
                 Column {
                     anchors.fill: parent
@@ -609,6 +558,25 @@ PluginComponent {
                             visible: root.items.length > 0
                             boundsBehavior: Flickable.StopAtBounds
 
+                            Rectangle {
+                                visible: listView.contentHeight > listView.height + 1
+                                anchors.right: listView.right
+                                anchors.top: listView.top
+                                anchors.bottom: listView.bottom
+                                anchors.rightMargin: -2
+                                width: 4
+                                radius: 2
+                                color: "transparent"
+
+                                Rectangle {
+                                    width: parent.width
+                                    height: Math.max(24, listView.height * listView.height / Math.max(listView.contentHeight, 1))
+                                    y: listView.contentY / Math.max(listView.contentHeight - listView.height, 1) * (parent.height - height)
+                                    radius: 2
+                                    color: Theme.withAlpha(Theme.surfaceText, 0.18)
+                                }
+                            }
+
                             delegate: StyledRect {
                                 id: card
                                 width: listView.width
@@ -632,6 +600,20 @@ PluginComponent {
                                         duration: Theme.shortDuration
                                         easing.type: Easing.OutCubic
                                     }
+                                }
+
+                                Rectangle {
+                                    id: unreadBar
+                                    visible: index < root.unread
+                                    anchors.left: parent.left
+                                    anchors.top: parent.top
+                                    anchors.bottom: parent.bottom
+                                    anchors.leftMargin: Theme.spacingXXS
+                                    anchors.topMargin: 10
+                                    anchors.bottomMargin: 10
+                                    width: 3
+                                    radius: 1.5
+                                    color: root.kindColor(modelData.kind)
                                 }
 
                                 MouseArea {
@@ -679,41 +661,32 @@ PluginComponent {
                                             height: 40
                                             visible: String(modelData.pfpUrl || "").length > 0
                                             imageSource: modelData.pfpUrl || ""
-                                            border.color: Theme.withAlpha(root.kindColor(modelData.kind), 0.25)
-                                            border.width: 1
+                                            border.color: Theme.withAlpha(Theme.surfaceText, 0.18)
+                                            border.width: 1.5
                                         }
 
                                         Rectangle {
-                                            id: reactionBadge
-                                            visible: modelData.kind === Nostr.KIND_REACTION
-                                            anchors.right: parent.right
-                                            anchors.bottom: parent.bottom
-                                            anchors.rightMargin: -3
-                                            anchors.bottomMargin: -3
-                                            width: 22
-                                            height: 22
-                                            radius: 11
-                                            color: Theme.surfaceContainerHigh
-                                            border.color: Theme.withAlpha(Theme.secondary, 0.35)
-                                            border.width: 1
+                                        id: reactionBadge
+                                        visible: modelData.kind === Nostr.KIND_REACTION
+                                        anchors.right: parent.right
+                                        anchors.bottom: parent.bottom
+                                        anchors.rightMargin: -3
+                                        anchors.bottomMargin: -3
+                                        width: 22
+                                        height: 22
+                                        radius: 11
+                                        color: Theme.surfaceContainerLowest
+                                        border.color: Theme.withAlpha(Theme.secondary, 0.45)
+                                        border.width: 1.5
 
-                                            StyledText {
-                                                anchors.centerIn: parent
-                                                text: root.reactionEmoji(modelData.kind, modelData.content)
-                                                font.pixelSize: 14
-                                            }
-                                        }
-
-                                        Rectangle {
-                                            visible: index < root.unread
-                                            width: 10
-                                            height: 10
-                                            radius: 5
-                                            color: Theme.primary
-                                            anchors.right: parent.right
-                                            anchors.top: parent.top
+                                        StyledText {
+                                            anchors.centerIn: parent
+                                            text: root.reactionEmoji(modelData.kind, modelData.content)
+                                            font.pixelSize: 14
+                                            font.family: "Noto Color Emoji"
                                         }
                                     }
+                                }
 
                                     Column {
                                         width: parent.width - cardRow.spacing - 40 - 64
@@ -732,10 +705,10 @@ PluginComponent {
 
                                         StyledText {
                                             width: parent.width
-                                            text: root.bodyLine(modelData)
+                                            text: root.bodyLineHtml(modelData)
                                             color: Theme.surfaceVariantText
                                             font.pixelSize: Theme.fontSizeSmall
-                                            elide: Text.ElideRight
+                                            textFormat: Text.RichText
                                             maximumLineCount: 1
                                         }
                                     }
@@ -780,7 +753,7 @@ PluginComponent {
 
                                                 DankIcon {
                                                     anchors.centerIn: parent
-                                                    name: "thumb_up"
+                                                    name: "add_reaction"
                                                     size: 14
                                                     color: Theme.primary
                                                 }
@@ -841,6 +814,8 @@ PluginComponent {
                                     height: 72
                                     radius: 36
                                     color: root.connected ? Theme.withAlpha(Theme.primary, 0.12) : Theme.withAlpha(Theme.warning, 0.12)
+                                    border.color: root.connected ? Theme.withAlpha(Theme.primary, 0.35) : Theme.withAlpha(Theme.warning, 0.35)
+                                    border.width: 1
                                     anchors.horizontalCenter: parent.horizontalCenter
 
                                     DankIcon {
@@ -922,12 +897,28 @@ PluginComponent {
 
                     Row {
                         width: parent.width
-                        spacing: Theme.spacingXS
+                        spacing: 6
+
+                        Rectangle {
+                            width: 18
+                            height: 18
+                            radius: 9
+                            color: Theme.withAlpha(Theme.primary, 0.14)
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            DankIcon {
+                                anchors.centerIn: parent
+                                name: "reply"
+                                size: 12
+                                color: Theme.primary
+                            }
+                        }
 
                         StyledText {
                             text: "Replying to "
                             color: Theme.surfaceVariantText
                             font.pixelSize: Theme.fontSizeSmall
+                            anchors.verticalCenter: parent.verticalCenter
                         }
 
                         StyledText {
@@ -937,7 +928,8 @@ PluginComponent {
                             font.weight: Font.Medium
                             elide: Text.ElideRight
                             maximumLineCount: 1
-                            width: parent.width - 100
+                            width: parent.width - 190
+                            anchors.verticalCenter: parent.verticalCenter
                         }
                     }
 
@@ -973,7 +965,7 @@ PluginComponent {
         Item {
                 id: reactionPicker
                 width: parent.width
-                height: root.reactTarget && !root.reactBusy ? 56 : 0
+                height: root.reactTarget && !root.reactBusy ? 68 : 0
                 clip: true
 
                 Behavior on height {
@@ -983,47 +975,50 @@ PluginComponent {
                     }
                 }
 
-                Rectangle {
+                StyledRect {
                     anchors.fill: parent
+                    anchors.margins: Theme.spacingXS
+                    radius: Theme.cornerRadius
                     color: Theme.surfaceContainerHigh
+                    border.color: Theme.withAlpha(Theme.secondary, 0.16)
+                    border.width: 1
+                }
 
-                    Rectangle {
-                        anchors.top: parent.top
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        height: 1
-                        color: Theme.withAlpha(Theme.surfaceText, 0.08)
-                    }
+                Row {
+                    anchors.centerIn: parent
+                    spacing: Theme.spacingXS
 
-                    Row {
-                        anchors.fill: parent
-                        anchors.leftMargin: Theme.spacingS
-                        anchors.rightMargin: Theme.spacingS
-                        spacing: Theme.spacingXS
+                    Repeater {
+                        model: root.reactOptions
 
-                        Repeater {
-                            model: root.reactOptions
+                        Rectangle {
+                            id: pickerBtn
+                            width: 30
+                            height: 30
+                            radius: 15
+                            scale: pickerItem.containsMouse ? 1.2 : 1.0
+                            color: pickerItem.containsMouse ? Theme.withAlpha(Theme.primary, 0.18) : "transparent"
 
-                            Rectangle {
-                                width: 40
-                                height: 40
-                                radius: 20
-                                anchors.verticalCenter: parent.verticalCenter
-                                color: pickerItem.containsMouse ? Theme.withAlpha(Theme.primary, 0.16) : "transparent"
-
-                                StyledText {
-                                    anchors.centerIn: parent
-                                    text: modelData
-                                    font.pixelSize: 20
+                            Behavior on scale {
+                                NumberAnimation {
+                                    duration: 120
+                                    easing.type: Easing.OutCubic
                                 }
+                            }
 
-                                MouseArea {
-                                    id: pickerItem
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: root.sendReactionEmoji(modelData)
-                                }
+                            StyledText {
+                                anchors.centerIn: parent
+                                text: modelData
+                                font.pixelSize: 20
+                                font.family: "Noto Color Emoji"
+                            }
+
+                            MouseArea {
+                                id: pickerItem
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.sendReactionEmoji(modelData)
                             }
                         }
                     }
