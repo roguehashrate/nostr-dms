@@ -48,6 +48,14 @@ PluginSettings {
         ]
     }
 
+    StringSetting {
+        settingKey: "linkBase"
+        label: "Notification link"
+        description: "Base URL opened when you click a notification. The event ID is appended. Known patterns:\n\u2022 njump.me \u2014 https://njump.me/\n\u2022 Primal \u2014 https://primal.net/e/\n\u2022 Ditto \u2014 https://ditto.pub/e/\n\u2022 Snort \u2014 https://snort.social/note/\n\u2022 Nover \u2014 https://nover.io/e/"
+        placeholder: "https://njump.me/"
+        defaultValue: "https://njump.me/"
+    }
+
     SliderSetting {
         settingKey: "sinceDays"
         label: "Watch history"

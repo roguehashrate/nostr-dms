@@ -48,6 +48,12 @@ PluginComponent {
     readonly property bool connected: connectedVar.value === true
     readonly property bool usingDefaultKey: keyVar.value === true
     readonly property string lastStatus: String(statusVar.value || "")
+    readonly property string linkBase: {
+        var u = String(pluginData.linkBase || "").trim();
+        if (u.length === 0) u = "https://njump.me/";
+        if (u.charAt(u.length - 1) !== "/") u += "/";
+        return u;
+    }
 
     readonly property string badgeText: unread > 99 ? "99+" : String(unread)
     readonly property string detailsLine: {
@@ -642,7 +648,7 @@ PluginComponent {
                                             root.sendReaction(modelData);
                                             return;
                                         }
-                                        Qt.openUrlExternally("https://njump.me/" + modelData.id);
+                                        Qt.openUrlExternally(root.linkBase + modelData.id);
                                     }
                                 }
 

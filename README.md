@@ -9,8 +9,8 @@ can be sent right from the widget popout.
   reactions (`kind 7`) and zap receipts (`kind 9735`) tagged with your pubkey from your
   configured relays.
 - **Widget** — a nostr-logo pill in your bar with an unread badge. Click it to open a
-  popout with the latest activity; reply, react, or click an entry to open it on
-  [njump.me](https://njump.me/).
+   popout with the latest activity; reply, react, or click an entry to open it on
+   [njump.me](https://njump.me/) (configurable in settings).
 - **Launcher** — type `n <your text>` in the launcher and press Enter to publish a note.
 - **Settings** — nsec key, relays, event types to notify about, toasts.
 
@@ -91,6 +91,7 @@ Open **Settings → Plugins → Nostr** and set:
 |---------|---------|
 | `Private key (nsec)` | Your `nsec1...`. Leave empty to fall back to nak's machine default key (`nak key default`). |
 | `Relays` | Relays to publish to and watch. Add write/read-friendly relays (e.g. `wss://relay.ditto.pub`). |
+| `Notification link` | Base URL opened when clicking a notification (e.g. `https://njump.me/`, `https://primal.net/e/`). |
 | `Watch history` | Historical look-back used when the daemon connects. |
 | `Replies & mentions`, `Reactions`, `Zaps` | Toggles for which event types to notify about. |
 | `Show toasts` | Show a desktop toast per notification. |
@@ -111,7 +112,7 @@ header. A **provisional key** note appears if you haven't set one yet.
 1. Click the nostr-logo pill to open the popout.
 2. New activity shows as a numbered badge on the pill and a colored accent bar on the
    card. Each card shows the author's name/avatar, what they did, and when.
-3. **Click any card** to open the thread on njump.me.
+3. **Click any card** to open the thread on your configured nostr client (default: njump.me).
 4. **Mark all read** (header) clears the unread badge.
 
 ### Replying
@@ -138,7 +139,7 @@ header. A **provisional key** note appears if you haven't set one yet.
 - **Some relays reject publishes** — a few public relays refuse events from unknown
   keys. Replies and reactions still go through on relays that accept them.
 - **Reply shows but no text** — large previews are one-line ellipsized; open the card
-  on njump.me to read the full thread.
+   on your configured client (default njump.me) to read the full thread.
 - **Test the stream manually**:
 
   ```sh
